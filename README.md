@@ -88,3 +88,9 @@ Main use cases:
 4. **Manage access.** A manager adds a colleague to the product as an editor, or removes them.
 5. **Find things.** Anyone filters configurations (product, client, status, search) and the change history (product, author, date range).
 6. **Recover an account.** A user who forgot their password resets it through an email link.
+
+## First technical choices
+
+Python 3.12, Django, PostgreSQL and server-rendered Bootstrap pages. Start with Django models and normal HTML forms. Docker Compose will run the app and database.
+
+`confighub/` contains settings, `app/` the application, `static/` styling and `docs/` supporting material.

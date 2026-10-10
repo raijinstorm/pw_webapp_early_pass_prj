@@ -1,1 +1,1 @@
-{% extends "base.html" %}{% block content %}<h1>ConfigHub</h1><p>Configuration management</p>{% endblock %}
+{% extends 'base.html' %}{% block content %}<h1>Your products</h1>{% for p in products %}<div class="card my-2"><div class="card-body"><a href="{% url 'product_detail' p.code %}">{{ p.name }}</a><p>{{ p.description }}</p></div></div>{% empty %}<p>No products yet.</p>{% endfor %}{% endblock %}

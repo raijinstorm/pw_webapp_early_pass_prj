@@ -16,4 +16,4 @@ RUN useradd --create-home appuser
 USER appuser
 
 EXPOSE 8000
-CMD ["sh", "-c", "python manage.py migrate --noinput && gunicorn confighub.wsgi --bind 0.0.0.0:8000 --workers 3 --access-logfile -"]
+CMD ["sh", "-c", "python manage.py migrate --noinput && python manage.py seed_demo && gunicorn confighub.wsgi --bind 0.0.0.0:8000 --workers 3 --access-logfile -"]

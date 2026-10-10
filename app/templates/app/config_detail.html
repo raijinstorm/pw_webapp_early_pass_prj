@@ -1,0 +1,1 @@
+{% extends 'base.html' %}{% block content %}<h1>{{ config.product_name }} / {{ config.client_name }}</h1><table class="table">{% for k,v in config.data.items %}<tr><th>{{ k }}</th><td>{{ v }}</td></tr>{% endfor %}</table>{% endblock %}

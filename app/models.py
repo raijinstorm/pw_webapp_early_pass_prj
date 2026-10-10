@@ -35,6 +35,25 @@ class Client(models.Model):
     def __str__(self):
         return self.name
 
+class SchemaField(models.Model):
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='fields')
+    key = models.CharField(max_length=50)
+    label = models.CharField(max_length=100)
+    field_type = models.CharField(max_length=20)
+    required = models.BooleanField(default=True)
+    min_value = models.DecimalField(max_digits=20, decimal_places=6, null=True, blank=True)
+    max_value = models.DecimalField(max_digits=20, decimal_places=6, null=True, blank=True)
+    choices = ArrayField(models.TextField(), null=True, blank=True)
+    pattern = models.TextField(null=True, blank=True)
+    help_text = models.TextField(blank=True, default='')
+    position = models.IntegerField(default=0)
+
+    class Meta:
+        db_table = 'schema_field'
+
+    def __str__(self):
+        return f'{self.product.code}.{self.key}'
+
 class Configuration(models.Model):
     product = models.ForeignKey(Product, on_delete=models.PROTECT)
     client = models.ForeignKey(Client, on_delete=models.PROTECT)

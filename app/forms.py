@@ -49,7 +49,7 @@ def value_field(f):
     attrs = {}
     if f['required']:
         attrs['required'] = True
-    common = {'label': f['label'], 'help_text': f['help_text'], 'required': False}
+    common = {'label': f['label'], 'help_text': f['help_text'], 'required': f['required']}
     kind = f['field_type']
     if kind in ('integer', 'decimal'):
         if f['min_value'] is not None:
@@ -57,9 +57,9 @@ def value_field(f):
         if f['max_value'] is not None:
             attrs['max'] = f['max_value']
         if kind == 'integer':
-            return forms.IntegerField(widget=forms.NumberInput(attrs=attrs), **common)
+            return forms.IntegerField(min_value=f['min_value'], max_value=f['max_value'], widget=forms.NumberInput(attrs=attrs), **common)
         attrs['step'] = 'any'
-        return forms.DecimalField(widget=forms.NumberInput(attrs=attrs), **common)
+        return forms.DecimalField(min_value=f['min_value'], max_value=f['max_value'], widget=forms.NumberInput(attrs=attrs), **common)
     if kind == 'boolean':
         return forms.BooleanField(**common)
     if kind == 'date':
@@ -67,7 +67,7 @@ def value_field(f):
     if kind == 'choice':
         options = [('', '---------')] + [(c, c) for c in f['choices']]
         return forms.ChoiceField(choices=options, widget=forms.Select(attrs=attrs), **common)
-    return forms.CharField(widget=forms.TextInput(attrs=attrs), **common)
+    return forms.RegexField(regex=f['pattern'] or r'.*', max_length=500, widget=forms.TextInput(attrs=attrs), **common)
 
 def to_json_value(value):
     if isinstance(value, date):
@@ -187,18 +187,3 @@ class HistoryFilterForm(BootstrapFormMixin, forms.Form):
         if start and end and (start > end):
             self.add_error('date_to', "'To' must be on or after 'From'.")
         return cleaned
-
-from django import forms
-class ConfigForm(forms.Form):
-    value__refresh_hours = forms.IntegerField(min_value=1, max_value=168, label='Refresh hours')
-    value__currency = forms.ChoiceField(choices=[('EUR','EUR'),('USD','USD'),('PLN','PLN')], label='Currency')
-    comment = forms.CharField(max_length=200)
-    def __init__(self, *args, product, configuration=None, **kwargs):
-        super().__init__(*args, **kwargs)
-        if configuration:
-            for key, value in configuration['data'].items(): self.initial['value__'+key] = value
-        else:
-            self.fields['client'] = forms.TypedChoiceField(choices=[(c['id'],c['name']) for c in queries.clients_without_configuration(product['id'])], coerce=int)
-    def data_json(self):
-        return {'refresh_hours':self.cleaned_data['value__refresh_hours'], 'currency':self.cleaned_data['value__currency']}
-    def apply_db_error(self, error, messages=None): return False

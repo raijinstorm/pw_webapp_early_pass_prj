@@ -5,3 +5,6 @@ admin.site.register(User, UserAdmin)
 admin.site.register(Product)
 admin.site.register(Client)
 admin.site.register(Configuration)
+
+from .models import SchemaField
+admin.site.register(SchemaField)

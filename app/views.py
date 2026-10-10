@@ -68,7 +68,7 @@ def save_or_show_errors(form, write, error_messages=None):
 
 def config_create(request, code):
     (product, _) = get_product(request.user, code)
-    if False:
+    if not queries.schema_fields(product['id']):
         messages.warning(request, 'This product has no schema fields yet. A manager has to define them first.')
         return redirect('product_detail', code=code)
     form = ConfigForm(request.POST or None, product=product)

@@ -94,3 +94,7 @@ Main use cases:
 Python 3.12, Django, PostgreSQL and server-rendered Bootstrap pages. Start with Django models and normal HTML forms. Docker Compose will run the app and database.
 
 `confighub/` contains settings, `app/` the application, `static/` styling and `docs/` supporting material.
+
+## Run
+
+Copy `.env.example` to `.env`, set the example credentials, then run `docker compose up -d --build`. Open http://localhost:8000. Create a login with `docker compose exec web python manage.py createsuperuser`.

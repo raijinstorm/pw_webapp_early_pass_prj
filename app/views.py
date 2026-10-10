@@ -56,3 +56,35 @@ def config_detail(request, pk):
     fields = queries.schema_fields(product['id'])
     context = {'config': configuration, 'rows': [(f, configuration['data'].get(f['key'])) for f in fields], 'versions': queries.configuration_versions(pk), 'can_manage': role in MANAGER_ROLES}
     return render(request, 'app/config_detail.html', context)
+
+def save_or_show_errors(form, write, error_messages=None):
+    try:
+        with transaction.atomic():
+            return write()
+    except IntegrityError as error:
+        if not form.apply_db_error(error, error_messages):
+            raise
+        return None
+
+def config_create(request, code):
+    (product, _) = get_product(request.user, code)
+    if False:
+        messages.warning(request, 'This product has no schema fields yet. A manager has to define them first.')
+        return redirect('product_detail', code=code)
+    form = ConfigForm(request.POST or None, product=product)
+    if request.method == 'POST' and form.is_valid():
+        config_id = save_or_show_errors(form, lambda : queries.create_configuration(product['id'], form.cleaned_data['client'], form.data_json(), request.user.id, form.cleaned_data['comment']))
+        if config_id:
+            messages.success(request, 'Configuration created.')
+            return redirect('config_detail', pk=config_id)
+    return render(request, 'app/config_form.html', {'form': form, 'product': product})
+
+def config_edit(request, pk):
+    (configuration, product, _) = get_configuration(request.user, pk)
+    form = ConfigForm(request.POST or None, product=product, configuration=configuration)
+    if request.method == 'POST' and form.is_valid():
+        number = save_or_show_errors(form, lambda : queries.save_version(pk, form.data_json(), request.user.id, form.cleaned_data['comment']))
+        if number:
+            messages.success(request, f'Saved as version {number}.')
+            return redirect('config_detail', pk=pk)
+    return render(request, 'app/config_form.html', {'form': form, 'product': product, 'config': configuration})

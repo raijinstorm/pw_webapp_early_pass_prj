@@ -187,3 +187,18 @@ class HistoryFilterForm(BootstrapFormMixin, forms.Form):
         if start and end and (start > end):
             self.add_error('date_to', "'To' must be on or after 'From'.")
         return cleaned
+
+from django import forms
+class ConfigForm(forms.Form):
+    value__refresh_hours = forms.IntegerField(min_value=1, max_value=168, label='Refresh hours')
+    value__currency = forms.ChoiceField(choices=[('EUR','EUR'),('USD','USD'),('PLN','PLN')], label='Currency')
+    comment = forms.CharField(max_length=200)
+    def __init__(self, *args, product, configuration=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        if configuration:
+            for key, value in configuration['data'].items(): self.initial['value__'+key] = value
+        else:
+            self.fields['client'] = forms.TypedChoiceField(choices=[(c['id'],c['name']) for c in queries.clients_without_configuration(product['id'])], coerce=int)
+    def data_json(self):
+        return {'refresh_hours':self.cleaned_data['value__refresh_hours'], 'currency':self.cleaned_data['value__currency']}
+    def apply_db_error(self, error, messages=None): return False

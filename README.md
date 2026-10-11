@@ -98,3 +98,7 @@ Python 3.12, Django, PostgreSQL and server-rendered Bootstrap pages. Start with 
 ## Run
 
 Copy `.env.example` to `.env`, set the example credentials, then run `docker compose up -d --build`. Open http://localhost:8000. Create a login with `docker compose exec web python manage.py createsuperuser`.
+
+## Validation update
+
+PostgreSQL now checks schema rules and reference-data constraints. Django still manages version creation for now. Existing demo databases need their current configuration data represented by version rows before the next versioning update.

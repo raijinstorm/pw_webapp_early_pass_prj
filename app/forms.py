@@ -49,7 +49,7 @@ def value_field(f):
     attrs = {}
     if f['required']:
         attrs['required'] = True
-    common = {'label': f['label'], 'help_text': f['help_text'], 'required': f['required']}
+    common = {'label': f['label'], 'help_text': f['help_text'], 'required': False}
     kind = f['field_type']
     if kind in ('integer', 'decimal'):
         if f['min_value'] is not None:
@@ -57,9 +57,9 @@ def value_field(f):
         if f['max_value'] is not None:
             attrs['max'] = f['max_value']
         if kind == 'integer':
-            return forms.IntegerField(min_value=f['min_value'], max_value=f['max_value'], widget=forms.NumberInput(attrs=attrs), **common)
+            return forms.IntegerField(widget=forms.NumberInput(attrs=attrs), **common)
         attrs['step'] = 'any'
-        return forms.DecimalField(min_value=f['min_value'], max_value=f['max_value'], widget=forms.NumberInput(attrs=attrs), **common)
+        return forms.DecimalField(widget=forms.NumberInput(attrs=attrs), **common)
     if kind == 'boolean':
         return forms.BooleanField(**common)
     if kind == 'date':
@@ -67,7 +67,7 @@ def value_field(f):
     if kind == 'choice':
         options = [('', '---------')] + [(c, c) for c in f['choices']]
         return forms.ChoiceField(choices=options, widget=forms.Select(attrs=attrs), **common)
-    return forms.RegexField(regex=f['pattern'] or r'.*', max_length=500, widget=forms.TextInput(attrs=attrs), **common)
+    return forms.CharField(widget=forms.TextInput(attrs=attrs), **common)
 
 def to_json_value(value):
     if isinstance(value, date):
@@ -93,6 +93,18 @@ class ConfigForm(BootstrapFormMixin, forms.Form):
                 self.initial[name] = configuration['data'].get(f['key'])
         self.fields['comment'] = forms.CharField(max_length=200, label='Change comment', help_text='Why are you making this change? Shown in the history.')
         self.style_fields()
+
+    def clean(self):
+        cleaned = super().clean()
+        if self.errors:
+            return cleaned
+        from .db import fetch_all, as_jsonb
+        data = {f['key']: to_json_value(cleaned.get(VALUE_PREFIX + f['key'])) for f in self.schema}
+        product_id = self.schema[0]['product_id'] if self.schema else None
+        for problem in fetch_all('SELECT field_key, message FROM config_errors(%s, %s::jsonb)', [product_id, as_jsonb(data)]):
+            key = VALUE_PREFIX + (problem['field_key'] or '')
+            self.add_error(key if key in self.fields else None, problem['message'])
+        return cleaned
 
     def value_fields(self):
         return [self[VALUE_PREFIX + f['key']] for f in self.schema]

@@ -84,7 +84,12 @@ def create_configuration(product_id, client_id, data, author_id, comment):
         return c.id
 
 def save_version(config_id, data, author_id, comment):
+    from .db import fetch_all, as_jsonb
+    from django.db import IntegrityError
     c = m.Configuration.objects.get(pk=config_id)
+    problems = fetch_all('SELECT field_key, message FROM config_errors(%s, %s::jsonb)', [c.product_id, as_jsonb(data)])
+    if problems:
+        raise ValueError('; '.join(x['message'] for x in problems))
     c.version += 1
     c.data = data
     c.updated_by_id = author_id

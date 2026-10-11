@@ -35,6 +35,18 @@ class Client(models.Model):
     def __str__(self):
         return self.name
 
+class Membership(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='memberships')
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='memberships')
+    role = models.CharField(max_length=20, choices=Role.choices, default=Role.EDITOR)
+
+    class Meta:
+        db_table = 'membership'
+        constraints = [models.UniqueConstraint(fields=['user', 'product'], name='membership_unique')]
+
+    def __str__(self):
+        return f'{self.user} – {self.product} ({self.get_role_display()})'
+
 class SchemaField(models.Model):
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='fields')
     key = models.CharField(max_length=50)

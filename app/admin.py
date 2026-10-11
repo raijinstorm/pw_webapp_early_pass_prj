@@ -8,3 +8,6 @@ admin.site.register(Configuration)
 
 from .models import SchemaField
 admin.site.register(SchemaField)
+
+from .models import Membership
+admin.site.register(Membership)

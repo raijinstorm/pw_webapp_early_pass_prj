@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}Not found{% endblock %}
+{% block content %}
+<div class="text-center py-5">
+  <div class="display-4 text-body-tertiary">404</div>
+  <h1 class="h4">Not found</h1>
+  <p class="text-body-secondary">This page doesn't exist.</p>
+  <a href="{% url 'dashboard' %}" class="btn btn-primary">Back to dashboard</a>
+</div>
+{% endblock %}

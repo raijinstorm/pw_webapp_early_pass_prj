@@ -1,113 +1,84 @@
 from django.conf import settings
-from django.db import transaction
-from django.utils import timezone
-from . import models as m
+from .db import as_jsonb, execute, fetch_all, fetch_one, fetch_value
 
 def user_role(user_id, product_id):
-    user = m.User.objects.filter(pk=user_id, is_active=True).first()
-    if not user:
-        return None
-    if user.is_superuser:
-        return 'admin'
-    if not hasattr(m, 'Membership'):
-        return 'editor'
-    return m.Membership.objects.filter(user_id=user_id, product_id=product_id).values_list('role', flat=True).first()
+    return fetch_value('SELECT user_role(%s, %s)', [user_id, product_id])
 
 def product_by_id(product_id):
-    return m.Product.objects.filter(pk=product_id).values().first()
+    return fetch_one('SELECT * FROM product WHERE id = %s', [product_id])
 
 def product_by_code(code):
-    return m.Product.objects.filter(code=code).values().first()
+    return fetch_one('SELECT * FROM product WHERE code = %s', [code])
 
 def visible_products(user_id):
-    return [dict(p, role=user_role(user_id, p['id']), config_count=m.Configuration.objects.filter(product_id=p['id']).count()) for p in m.Product.objects.values().order_by('name') if user_role(user_id, p['id'])]
-
-def config_row(c):
-    return dict(id=c.id, product_id=c.product_id, product_code=c.product.code, product_name=c.product.name, client_id=c.client_id, client_name=c.client.name, status=c.status, version=c.version, data=c.data, updated_at=c.updated_at, updated_by=c.updated_by.username if c.updated_by else None)
+    return fetch_all('\n        SELECT p.id, p.code, p.name, p.description,\n               user_role(%(user)s, p.id) AS role,\n               (SELECT count(*) FROM configuration c WHERE c.product_id = p.id) AS config_count\n        FROM product p\n        WHERE p.id IN (SELECT product_id FROM visible_product_ids(%(user)s))\n        ORDER BY p.name\n        ', {'user': user_id})
 
 def configurations(user_id, product=None, client=None, status=None, search=None):
-    qs = m.Configuration.objects.select_related('product', 'client', 'updated_by').order_by('product__name', 'client__name')
-    if product: qs = qs.filter(product__code=product)
-    if client: qs = qs.filter(client_id=client)
-    if status: qs = qs.filter(status=status)
-    if search: qs = qs.filter(client__name__icontains=search)
-    return [config_row(c) for c in qs if user_role(user_id, c.product_id)]
+    return fetch_all("\n        SELECT * FROM configuration_overview\n        WHERE product_id IN (SELECT product_id FROM visible_product_ids(%(user)s))\n          AND (%(product)s::text IS NULL OR product_code = %(product)s)\n          AND (%(client)s::bigint IS NULL OR client_id = %(client)s)\n          AND (%(status)s::text IS NULL OR status = %(status)s)\n          AND (%(search)s::text IS NULL OR client_name ILIKE '%%' || %(search)s || '%%')\n        ORDER BY product_name, client_name\n        ", {'user': user_id, 'product': product, 'client': client, 'status': status, 'search': search})
 
 def configuration(config_id):
-    c = m.Configuration.objects.select_related('product', 'client', 'updated_by').filter(pk=config_id).first()
-    return config_row(c) if c else None
-
-def clients():
-    return list(m.Client.objects.order_by('name').values('id', 'name'))
-
-def clients_without_configuration(product_id):
-    return list(m.Client.objects.exclude(id__in=m.Configuration.objects.filter(product_id=product_id).values('client_id')).order_by('name').values('id', 'name'))
-
-def schema_fields(product_id):
-    return list(m.SchemaField.objects.filter(product_id=product_id).order_by('position', 'key').values()) if hasattr(m, 'SchemaField') else []
-
-def version_row(v):
-    c = v.configuration
-    return dict(id=v.id, configuration_id=c.id, number=v.number, is_current=v.number == c.version, data=v.data, comment=v.comment, created_at=v.created_at, author_id=v.author_id, author=v.author.username if v.author else None, product_id=c.product_id, product_code=c.product.code, product_name=c.product.name, client_name=c.client.name)
+    return fetch_one('SELECT * FROM configuration_overview WHERE id = %s', [config_id])
 
 def versions(user_id, product=None, author=None, date_from=None, date_to=None, limit=None):
-    if not hasattr(m, 'ConfigVersion'): return []
-    qs = m.ConfigVersion.objects.select_related('configuration__product', 'configuration__client', 'author').order_by('-created_at', '-id')
-    if product: qs = qs.filter(configuration__product__code=product)
-    if author: qs = qs.filter(author__username=author)
-    if date_from: qs = qs.filter(created_at__date__gte=date_from)
-    if date_to: qs = qs.filter(created_at__date__lte=date_to)
-    rows = [version_row(v) for v in qs if user_role(user_id, v.configuration.product_id)]
-    return rows[:limit] if limit else rows
+    return fetch_all('\n        SELECT * FROM version_overview\n        WHERE product_id IN (SELECT product_id FROM visible_product_ids(%(user)s))\n          AND (%(product)s::text IS NULL OR product_code = %(product)s)\n          AND (%(author)s::text IS NULL OR author = %(author)s)\n          AND (%(date_from)s::date IS NULL OR (created_at AT TIME ZONE %(tz)s)::date >= %(date_from)s)\n          AND (%(date_to)s::date IS NULL OR (created_at AT TIME ZONE %(tz)s)::date <= %(date_to)s)\n        ORDER BY created_at DESC, id DESC\n        LIMIT %(limit)s\n        ', {'user': user_id, 'product': product, 'author': author, 'date_from': date_from, 'date_to': date_to, 'tz': 'UTC', 'limit': limit})
 
 def history_authors(user_id):
-    return [{'author': a} for a in sorted({v['author'] for v in versions(user_id) if v['author']})]
+    return fetch_all('\n        SELECT DISTINCT author FROM version_overview\n        WHERE author IS NOT NULL\n          AND product_id IN (SELECT product_id FROM visible_product_ids(%s))\n        ORDER BY author\n        ', [user_id])
 
 def configuration_versions(config_id):
-    if not hasattr(m, 'ConfigVersion'): return []
-    return [version_row(v) for v in m.ConfigVersion.objects.filter(configuration_id=config_id).select_related('configuration__product', 'configuration__client', 'author').order_by('-number')]
+    return fetch_all('SELECT * FROM version_overview WHERE configuration_id = %s ORDER BY number DESC', [config_id])
 
 def version(version_id):
-    v = m.ConfigVersion.objects.filter(pk=version_id).select_related('configuration__product', 'configuration__client', 'author').first()
-    return version_row(v) if v else None
+    return fetch_one('SELECT * FROM version_overview WHERE id = %s', [version_id])
 
 def version_changes(version_id):
-    v = version(version_id)
-    prev = m.ConfigVersion.objects.filter(configuration_id=v['configuration_id'], number=v['number']-1).first()
-    old = prev.data if prev else {}
-    return [{'key': k, 'old': old.get(k), 'new': v['data'].get(k)} for k in sorted(set(old) | set(v['data'])) if old.get(k) != v['data'].get(k)]
+    return fetch_all('SELECT key, old_value AS old, new_value AS new FROM version_changes(%s)', [version_id])
 
 def create_configuration(product_id, client_id, data, author_id, comment):
-    with transaction.atomic():
-        c = m.Configuration.objects.create(product_id=product_id, client_id=client_id)
-        save_version(c.id, data, author_id, comment)
-        return c.id
+    return fetch_value('SELECT create_configuration(%s, %s, %s::jsonb, %s, %s)', [product_id, client_id, as_jsonb(data), author_id, comment])
 
 def save_version(config_id, data, author_id, comment):
-    from .db import fetch_all, as_jsonb
-    from django.db import IntegrityError
-    c = m.Configuration.objects.get(pk=config_id)
-    problems = fetch_all('SELECT field_key, message FROM config_errors(%s, %s::jsonb)', [c.product_id, as_jsonb(data)])
-    if problems:
-        raise ValueError('; '.join(x['message'] for x in problems))
-    c.version += 1
-    c.data = data
-    c.updated_by_id = author_id
-    c.save()
-    if hasattr(m, 'ConfigVersion'):
-        m.ConfigVersion.objects.create(configuration_id=c.id, number=c.version, data=data, author_id=author_id, comment=comment, created_at=timezone.now())
-    return c.version
+    return fetch_value('\n        INSERT INTO config_version (configuration_id, data, author_id, comment)\n        VALUES (%s, %s::jsonb, %s, %s)\n        RETURNING number\n        ', [config_id, as_jsonb(data), author_id, comment])
 
 def restore_version(version_id, author_id):
-    v = version(version_id)
-    return save_version(v['configuration_id'], v['data'], author_id, 'Restored version ' + str(v['number']))
+    return fetch_value('SELECT restore_version(%s, %s)', [version_id, author_id])
 
 def toggle_status(config_id):
-    c = m.Configuration.objects.get(pk=config_id)
-    c.status = 'disabled' if c.status == 'active' else 'active'
-    c.save()
-    return c.status
+    return fetch_value("\n        UPDATE configuration\n        SET status = CASE status WHEN 'active' THEN 'disabled' ELSE 'active' END, updated_at = now()\n        WHERE id = %s\n        RETURNING status\n        ", [config_id])
+
+def clients():
+    return fetch_all('SELECT id, name FROM client ORDER BY name')
+
+def clients_without_configuration(product_id):
+    return fetch_all('\n        SELECT id, name FROM client\n        WHERE id NOT IN (SELECT client_id FROM configuration WHERE product_id = %s)\n        ORDER BY name\n        ', [product_id])
+FIELD_COLUMNS = ['label', 'field_type', 'required', 'min_value', 'max_value', 'choices', 'pattern', 'help_text', 'position']
+
+def schema_fields(product_id):
+    return fetch_all('SELECT * FROM schema_field WHERE product_id = %s ORDER BY position, key', [product_id])
+
+def schema_field(product_id, field_id):
+    return fetch_one('SELECT * FROM schema_field WHERE product_id = %s AND id = %s', [product_id, field_id])
+
+def insert_schema_field(product_id, values):
+    return fetch_value('\n        INSERT INTO schema_field (product_id, key, label, field_type, required, min_value, max_value,\n                                  choices, pattern, help_text, position)\n        VALUES (%(product_id)s, %(key)s, %(label)s, %(field_type)s, %(required)s, %(min_value)s, %(max_value)s,\n                %(choices)s, %(pattern)s, %(help_text)s, %(position)s)\n        RETURNING id\n        ', {'product_id': product_id, **values})
+
+def update_schema_field(field_id, values):
+    return execute('\n        UPDATE schema_field\n        SET label = %(label)s, field_type = %(field_type)s, required = %(required)s,\n            min_value = %(min_value)s, max_value = %(max_value)s, choices = %(choices)s,\n            pattern = %(pattern)s, help_text = %(help_text)s, position = %(position)s\n        WHERE id = %(id)s\n        ', {'id': field_id, **{k: values[k] for k in FIELD_COLUMNS}})
+
+def delete_schema_field(field_id):
+    execute('DELETE FROM schema_field WHERE id = %s', [field_id])
 
 def members(product_id):
-    if not hasattr(m, 'Membership'): return []
-    return [dict(id=x.id, user_id=x.user_id, role=x.role, username=x.user.username, full_name=x.user.get_full_name()) for x in m.Membership.objects.filter(product_id=product_id).select_related('user')]
+    return fetch_all("\n        SELECT m.id, m.user_id, m.role, u.username,\n               nullif(btrim(u.first_name || ' ' || u.last_name), '') AS full_name\n        FROM membership m JOIN app_user u ON u.id = m.user_id\n        WHERE m.product_id = %s\n        ORDER BY m.role, u.username\n        ", [product_id])
+
+def membership(membership_id):
+    return fetch_one('SELECT * FROM membership WHERE id = %s', [membership_id])
+
+def active_user_id(username):
+    return fetch_value('SELECT id FROM app_user WHERE username = %s AND is_active', [username])
+
+def add_member(product_id, user_id, role):
+    return execute('INSERT INTO membership (user_id, product_id, role) VALUES (%s, %s, %s)', [user_id, product_id, role])
+
+def remove_member(membership_id):
+    execute('DELETE FROM membership WHERE id = %s', [membership_id])

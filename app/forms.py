@@ -94,18 +94,6 @@ class ConfigForm(BootstrapFormMixin, forms.Form):
         self.fields['comment'] = forms.CharField(max_length=200, label='Change comment', help_text='Why are you making this change? Shown in the history.')
         self.style_fields()
 
-    def clean(self):
-        cleaned = super().clean()
-        if self.errors:
-            return cleaned
-        from .db import fetch_all, as_jsonb
-        data = {f['key']: to_json_value(cleaned.get(VALUE_PREFIX + f['key'])) for f in self.schema}
-        product_id = self.schema[0]['product_id'] if self.schema else None
-        for problem in fetch_all('SELECT field_key, message FROM config_errors(%s, %s::jsonb)', [product_id, as_jsonb(data)]):
-            key = VALUE_PREFIX + (problem['field_key'] or '')
-            self.add_error(key if key in self.fields else None, problem['message'])
-        return cleaned
-
     def value_fields(self):
         return [self[VALUE_PREFIX + f['key']] for f in self.schema]
 

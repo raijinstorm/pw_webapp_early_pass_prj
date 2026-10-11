@@ -1,16 +1,45 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
-from .models import User, Product, Client, Configuration
-admin.site.register(User, UserAdmin)
-admin.site.register(Product)
-admin.site.register(Client)
-admin.site.register(Configuration)
+from .models import Client, Configuration, ConfigVersion, Membership, Product, User
 
-from .models import SchemaField
-admin.site.register(SchemaField)
+class MembershipInline(admin.TabularInline):
+    model = Membership
+    extra = 1
 
-from .models import Membership
-admin.site.register(Membership)
+class NoDeleteMixin:
 
-from .models import ConfigVersion
-admin.site.register(ConfigVersion)
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+class ReadOnlyMixin(NoDeleteMixin):
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+@admin.register(User)
+class ConfigHubUserAdmin(NoDeleteMixin, UserAdmin):
+    inlines = [MembershipInline]
+    list_display = ['username', 'email', 'first_name', 'last_name', 'is_superuser', 'is_active']
+
+@admin.register(Product)
+class ProductAdmin(NoDeleteMixin, admin.ModelAdmin):
+    list_display = ['name', 'code', 'created_at']
+    prepopulated_fields = {'code': ['name']}
+    inlines = [MembershipInline]
+
+@admin.register(Client)
+class ClientAdmin(NoDeleteMixin, admin.ModelAdmin):
+    search_fields = ['name']
+
+@admin.register(Configuration)
+class ConfigurationAdmin(ReadOnlyMixin, admin.ModelAdmin):
+    list_display = ['product', 'client', 'status', 'version', 'updated_at', 'updated_by']
+    list_filter = ['product', 'status']
+
+@admin.register(ConfigVersion)
+class ConfigVersionAdmin(ReadOnlyMixin, admin.ModelAdmin):
+    list_display = ['configuration', 'number', 'author', 'created_at', 'comment']
+    list_filter = ['configuration__product']

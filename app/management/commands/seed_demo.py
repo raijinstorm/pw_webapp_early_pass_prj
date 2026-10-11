@@ -1,12 +1,23 @@
 import os
-from django.core.management.base import BaseCommand
-from app.models import User, Product, Client, Configuration, SchemaField
+from django.conf import settings
+from django.core.management.base import BaseCommand, CommandError
+from django.db import connection, transaction
+from app.models import User
+USERS = [('admin', 'Alex', 'Admin', True), ('anna', 'Anna', 'Kowalska', False), ('tomasz', 'Tomasz', 'Nowak', False), ('piotr', 'Piotr', 'Wiśniewski', False), ('ewa', 'Ewa', 'Zielińska', False), ('jan', 'Jan', 'Lewandowski', False)]
+
 class Command(BaseCommand):
-    def handle(self, *args, **kwargs):
-        if User.objects.exists(): return
-        u = User.objects.create_superuser('admin', 'admin@confighub.example.com', os.environ['DEMO_PASSWORD'])
-        p = Product.objects.create(code='pricing-feed', name='Pricing Feed', description='Daily pricing settings')
-        SchemaField.objects.create(product=p, key='refresh_hours', label='Refresh hours', field_type='integer', min_value=1, max_value=168)
-        SchemaField.objects.create(product=p, key='currency', label='Currency', field_type='choice', choices=['EUR','USD','PLN'])
-        c = Client.objects.create(name='Acme')
-        Configuration.objects.create(product=p, client=c, data={'refresh_hours':6, 'currency':'EUR'}, updated_by=u)
+    help = 'Load fictional demo data (only if the database has no users yet).'
+
+    def handle(self, *args, **options):
+        if User.objects.exists():
+            self.stdout.write('Users already exist – skipping demo data.')
+            return
+        password = os.environ.get('DEMO_PASSWORD')
+        if not password:
+            raise CommandError('Set DEMO_PASSWORD to create the demo users.')
+        with transaction.atomic():
+            for (username, first, last, is_admin) in USERS:
+                User.objects.create_user(username, f'{username}@confighub.example.com', password, first_name=first, last_name=last, is_superuser=is_admin, is_staff=is_admin)
+            with connection.cursor() as cursor:
+                cursor.execute((settings.BASE_DIR / 'sql' / 'demo_data.sql').read_text())
+        self.stdout.write(self.style.SUCCESS('Demo data created.'))

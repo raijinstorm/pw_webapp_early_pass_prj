@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}History{% endblock %}
+{% block content %}
+<h1 class="h3 mb-3">Change history</h1>
+
+<form class="row g-2 mb-3 align-items-start" method="get" action="{% url 'history_list' %}">
+  <div class="col-6 col-md-3">{{ form.product }}</div>
+  <div class="col-6 col-md-3">{{ form.author }}</div>
+  <div class="col-6 col-md-2">{{ form.date_from }}</div>
+  <div class="col-6 col-md-2">{{ form.date_to }}</div>
+  <div class="col-12 col-md-2 d-grid"><a href="{% url 'history_list' %}" class="btn btn-outline-secondary">Reset</a></div>
+</form>
+
+<div id="results">{% include "app/partials/history_table.html" %}</div>
+{% endblock %}

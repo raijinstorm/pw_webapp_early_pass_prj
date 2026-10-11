@@ -1,1 +1,51 @@
-{% extends 'base.html' %}{% block content %}<h1>Your products</h1>{% for p in products %}<div class="card my-2"><div class="card-body"><a href="{% url 'product_detail' p.code %}">{{ p.name }}</a><p>{{ p.description }}</p></div></div>{% empty %}<p>No products yet.</p>{% endfor %}{% endblock %}
+{% extends "base.html" %}
+{% load app_extras %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-2">
+  <div>
+    <h1 class="h3 mb-0">Hello, {{ user.first_name|default:user.username }}</h1>
+    <p class="text-body-secondary mb-0">Your products and the latest configuration changes.</p>
+  </div>
+</div>
+
+<h2 class="h5 mb-3">Products</h2>
+<div class="row g-3 mb-5">
+  {% for product in products %}
+  <div class="col-12 col-sm-6 col-lg-4">
+    <a href="{% url 'product_detail' product.code %}" class="card h-100 text-decoration-none card-link-hover">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start mb-2">
+          <h3 class="h6 card-title mb-0">{{ product.name }}</h3>
+          {{ product.role|role_badge }}
+        </div>
+        <p class="card-text small text-body-secondary">{{ product.description|truncatechars:110 }}</p>
+      </div>
+      <div class="card-footer small text-body-secondary">
+        <i class="bi bi-file-earmark-code"></i> {{ product.config_count }} configuration{{ product.config_count|pluralize }}
+      </div>
+    </a>
+  </div>
+  {% empty %}
+  <div class="col-12"><div class="alert alert-info mb-0">You are not a member of any product yet. Ask an admin to add you.</div></div>
+  {% endfor %}
+</div>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h2 class="h5 mb-0">Recent changes</h2>
+  <a href="{% url 'history_list' %}" class="small">Full history →</a>
+</div>
+<div class="list-group">
+  {% for v in recent %}
+  <a href="{% url 'config_detail' v.configuration_id %}" class="list-group-item list-group-item-action">
+    <div class="d-flex flex-wrap justify-content-between gap-2">
+      <span><strong>{{ v.product_name }}</strong> / {{ v.client_name }} <span class="badge text-bg-light border">v{{ v.number }}</span></span>
+      <small class="text-body-secondary">{{ v.author|default:"—" }} · {{ v.created_at|timesince }} ago</small>
+    </div>
+    <small class="text-body-secondary">{{ v.comment }}</small>
+  </a>
+  {% empty %}
+  <div class="list-group-item text-body-secondary">No changes yet.</div>
+  {% endfor %}
+</div>
+{% endblock %}

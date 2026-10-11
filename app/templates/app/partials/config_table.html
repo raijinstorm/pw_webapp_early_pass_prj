@@ -1,0 +1,28 @@
+{% url 'config_list' as url %}
+<div class="table-responsive">
+  <table class="table table-hover align-middle mb-0">
+    <thead class="table-light">
+      <tr>
+        <th>Product</th>
+        <th>Client</th>
+        <th>Status</th>
+        <th class="text-end">Version</th>
+        <th class="d-none d-md-table-cell">Last change</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for c in page %}
+      <tr class="clickable" onclick="location.href='{% url 'config_detail' c.id %}'">
+        <td><a href="{% url 'config_detail' c.id %}" class="fw-medium text-decoration-none">{{ c.product_name }}</a></td>
+        <td>{{ c.client_name }}</td>
+        <td>{% include "app/partials/status_badge.html" with config=c %}</td>
+        <td class="text-end">v{{ c.version }}</td>
+        <td class="d-none d-md-table-cell small text-body-secondary">{{ c.updated_by|default:"—" }} · {{ c.updated_at|date:"Y-m-d H:i" }}</td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="5" class="text-center text-body-secondary py-4">No configurations match these filters.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% include "app/partials/pagination.html" %}

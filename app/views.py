@@ -46,6 +46,24 @@ def dashboard(request):
     context = {'products': queries.visible_products(request.user.id), 'recent': queries.versions(request.user.id, limit=8)}
     return render(request, 'app/dashboard.html', context)
 
+def config_list(request):
+    form = ConfigFilterForm(request.GET or None, user=request.user)
+    f = filter_values(form)
+    rows = queries.configurations(request.user.id, product=f.get('product'), client=f.get('client'), status=f.get('status'), search=f.get('q'))
+    (page, querystring) = paginate(request, rows)
+    context = {'form': form, 'page': page, 'querystring': querystring}
+    template = 'app/partials/config_table.html' if is_htmx(request) else 'app/config_list.html'
+    return render(request, template, context)
+
+def history_list(request):
+    form = HistoryFilterForm(request.GET or None, user=request.user)
+    f = filter_values(form)
+    rows = queries.versions(request.user.id, product=f.get('product'), author=f.get('author'), date_from=f.get('date_from'), date_to=f.get('date_to'))
+    (page, querystring) = paginate(request, rows)
+    context = {'form': form, 'page': page, 'querystring': querystring}
+    template = 'app/partials/history_table.html' if is_htmx(request) else 'app/history_list.html'
+    return render(request, template, context)
+
 def product_detail(request, code):
     (product, role) = get_product(request.user, code)
     context = {'product': product, 'role': role, 'can_manage': role in MANAGER_ROLES, 'configs': queries.configurations(request.user.id, product=code), 'fields': queries.schema_fields(product['id']), 'memberships': queries.members(product['id']), 'member_form': MemberForm()}
@@ -88,3 +106,21 @@ def config_edit(request, pk):
             messages.success(request, f'Saved as version {number}.')
             return redirect('config_detail', pk=pk)
     return render(request, 'app/config_form.html', {'form': form, 'product': product, 'config': configuration})
+
+def version_detail(request, pk):
+    version = found(queries.version(pk))
+    (_, role) = get_product(request.user, version['product_code'])
+    context = {'version': version, 'changes': queries.version_changes(pk), 'can_manage': role in MANAGER_ROLES}
+    return render(request, 'app/partials/version_detail.html', context)
+
+@require_POST
+def version_restore(request, pk):
+    version = found(queries.version(pk))
+    get_product(request.user, version['product_code'], manage=True)
+    try:
+        with transaction.atomic():
+            number = queries.restore_version(pk, request.user.id)
+        messages.success(request, f"Version {version['number']} restored as version {number}.")
+    except IntegrityError as error:
+        messages.error(request, f"Version {version['number']} can't be restored: {error.__cause__.diag.message_primary}")
+    return redirect('config_detail', pk=version['configuration_id'])

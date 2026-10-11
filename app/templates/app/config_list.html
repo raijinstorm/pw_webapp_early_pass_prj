@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Configurations{% endblock %}
+{% block content %}
+<h1 class="h3 mb-3">Configurations</h1>
+
+
+<form class="row g-2 mb-3" method="get" action="{% url 'config_list' %}">
+  <div class="col-12 col-md-3">{{ form.q }}</div>
+  <div class="col-6 col-md-3">{{ form.product }}</div>
+  <div class="col-6 col-md-3">{{ form.client }}</div>
+  <div class="col-6 col-md-2">{{ form.status }}</div>
+  <div class="col-6 col-md-1 d-grid"><a href="{% url 'config_list' %}" class="btn btn-outline-secondary">Reset</a></div>
+</form>
+
+<div id="results">{% include "app/partials/config_table.html" %}</div>
+{% endblock %}

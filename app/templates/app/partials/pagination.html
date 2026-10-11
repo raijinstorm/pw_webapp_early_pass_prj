@@ -1,0 +1,20 @@
+
+{% if page.paginator.num_pages > 1 %}
+<nav class="d-flex justify-content-between align-items-center mt-3">
+  <small class="text-body-secondary">Page {{ page.number }} of {{ page.paginator.num_pages }} · {{ page.paginator.count }} rows</small>
+  <ul class="pagination pagination-sm mb-0">
+    {% if page.has_previous %}
+    <li class="page-item">
+      <a class="page-link" href="{{ url }}?{{ querystring }}&page={{ page.previous_page_number }}">Previous</a>
+    </li>
+    {% endif %}
+    {% if page.has_next %}
+    <li class="page-item">
+      <a class="page-link" href="{{ url }}?{{ querystring }}&page={{ page.next_page_number }}">Next</a>
+    </li>
+    {% endif %}
+  </ul>
+</nav>
+{% else %}
+<small class="text-body-secondary d-block mt-2">{{ page.paginator.count }} rows</small>
+{% endif %}

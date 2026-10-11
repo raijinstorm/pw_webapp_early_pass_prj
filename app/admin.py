@@ -11,3 +11,6 @@ admin.site.register(SchemaField)
 
 from .models import Membership
 admin.site.register(Membership)
+
+from .models import ConfigVersion
+admin.site.register(ConfigVersion)

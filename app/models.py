@@ -1,3 +1,4 @@
+from django.utils import timezone
 from django.contrib.auth.models import AbstractUser
 from django.contrib.postgres.fields import ArrayField
 from django.core.validators import RegexValidator
@@ -80,3 +81,18 @@ class Configuration(models.Model):
 
     def __str__(self):
         return f'{self.product} / {self.client}'
+
+class ConfigVersion(models.Model):
+    configuration = models.ForeignKey(Configuration, on_delete=models.PROTECT)
+    number = models.IntegerField()
+    data = models.JSONField()
+    comment = models.TextField()
+    author = models.ForeignKey(User, on_delete=models.PROTECT, null=True, related_name='+')
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        db_table = 'config_version'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.configuration} v{self.number}'

@@ -1,1 +1,83 @@
-{% load static %}<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>{% block title %}ConfigHub{% endblock %}</title><link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"><link href="{% static 'style.css' %}" rel="stylesheet"></head><body><nav class="navbar bg-dark"><div class="container"><a class="text-white" href="{% url 'dashboard' %}">ConfigHub</a><a class="text-white" href="{% url 'admin:index' %}">Admin</a><form method="post" action="{% url 'logout' %}">{% csrf_token %}<button>Log out</button></form></div></nav><main class="container py-4">{% for message in messages %}<div class="alert alert-info">{{ message }}</div>{% endfor %}{% block content %}{% endblock %}</main></body></html>
+{% load static %}<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}ConfigHub{% endblock %} · ConfigHub</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <link href="{% static 'style.css' %}" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.4/dist/htmx.min.js" defer></script>
+</head>
+
+<body hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+{% if user.is_authenticated %}
+<nav class="navbar navbar-expand-md bg-dark" data-bs-theme="dark">
+  <div class="container">
+    <a class="navbar-brand fw-semibold" href="{% url 'dashboard' %}"><i class="bi bi-sliders2"></i> ConfigHub</a>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#nav" aria-label="Menu">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="nav">
+      {% with name=request.resolver_match.url_name %}
+      <ul class="navbar-nav me-auto">
+        <li class="nav-item"><a class="nav-link {% if name == 'dashboard' %}active{% endif %}" href="{% url 'dashboard' %}">Dashboard</a></li>
+        <li class="nav-item"><a class="nav-link {% if name == 'config_list' %}active{% endif %}" href="{% url 'config_list' %}">Configurations</a></li>
+        <li class="nav-item"><a class="nav-link {% if name == 'history_list' %}active{% endif %}" href="{% url 'history_list' %}">History</a></li>
+        {% if user.is_admin %}
+        <li class="nav-item"><a class="nav-link" href="{% url 'admin:index' %}">Admin</a></li>
+        {% endif %}
+      </ul>
+      {% endwith %}
+      <div class="dropdown">
+        <button class="btn btn-outline-light btn-sm dropdown-toggle" data-bs-toggle="dropdown">
+          <i class="bi bi-person-circle"></i> {{ user.username }}
+        </button>
+        <ul class="dropdown-menu dropdown-menu-end">
+          <li><a class="dropdown-item" href="{% url 'password_change' %}">Change password</a></li>
+          <li><hr class="dropdown-divider"></li>
+          <li>
+            <form method="post" action="{% url 'logout' %}">{% csrf_token %}
+              <button class="dropdown-item">Log out</button>
+            </form>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</nav>
+{% endif %}
+
+<main class="container py-4">
+  <div id="messages">
+    {% for message in messages %}
+    <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %} alert-dismissible fade show">
+      {{ message }}
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+    {% endfor %}
+  </div>
+  {% block content %}{% endblock %}
+</main>
+
+
+<div class="modal fade" id="confirm-modal" tabindex="-1" aria-labelledby="confirm-title" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-sm">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title fs-6" id="confirm-title">Please confirm</h2>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" id="confirm-message"></div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-danger" id="confirm-ok">Confirm</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="{% static 'confirm.js' %}"></script>
+</body>
+</html>

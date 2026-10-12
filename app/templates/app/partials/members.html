@@ -7,7 +7,9 @@
     <span class="d-flex align-items-center gap-2">
       {{ m.role|role_badge }}
       {% if can_manage and m.user_id != user.id %}
-      <button class="btn btn-sm btn-link text-danger p-0" title="Remove">
+      <button class="btn btn-sm btn-link text-danger p-0" title="Remove"
+              hx-post="{% url 'member_remove' m.id %}" hx-target="#members"
+              hx-confirm="Remove {{ m.username }} from {{ product.name }}?">
         <i class="bi bi-x-circle"></i>
       </button>
       {% endif %}
@@ -18,7 +20,7 @@
   {% endfor %}
 </ul>
 {% if can_manage %}
-<form class="card-body border-top"
+<form class="card-body border-top" hx-post="{% url 'member_add' product.code %}" hx-target="#members"
       method="post" action="{% url 'member_add' product.code %}">
   {% csrf_token %}
   <div class="row g-2">

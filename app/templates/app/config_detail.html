@@ -46,12 +46,13 @@
       <div class="list-group list-group-flush">
         {% for v in versions %}
         
-        <a class="list-group-item" href="{% url 'version_detail' v.id %}">
+        <button type="button" class="list-group-item list-group-item-action"
+                hx-get="{% url 'version_detail' v.id %}" hx-target="#version-detail">
           <div class="d-flex justify-content-between">
             <span><span class="badge text-bg-light border">v{{ v.number }}</span> {{ v.comment }}</span>
           </div>
           <small class="text-body-secondary">{{ v.author|default:"—" }} · {{ v.created_at|date:"Y-m-d H:i" }}</small>
-        </a>
+        </button>
         {% endfor %}
       </div>
     </div>

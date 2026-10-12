@@ -3,7 +3,8 @@
 {% block content %}
 <h1 class="h3 mb-3">Change history</h1>
 
-<form class="row g-2 mb-3 align-items-start" method="get" action="{% url 'history_list' %}">
+<form class="row g-2 mb-3 align-items-start" method="get" action="{% url 'history_list' %}"
+      hx-get="{% url 'history_list' %}" hx-target="#results" hx-push-url="true" hx-trigger="change">
   <div class="col-6 col-md-3">{{ form.product }}</div>
   <div class="col-6 col-md-3">{{ form.author }}</div>
   <div class="col-6 col-md-2">{{ form.date_from }}</div>

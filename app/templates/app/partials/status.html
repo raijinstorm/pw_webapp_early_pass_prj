@@ -1,6 +1,7 @@
 {% include "app/partials/status_badge.html" %}
 {% if can_manage %}
-<button class="btn btn-sm btn-outline-secondary ms-1">
+<button class="btn btn-sm btn-outline-secondary ms-1"
+        hx-post="{% url 'config_toggle_status' config.id %}" hx-target="#status">
   {% if config.status == "active" %}Disable{% else %}Activate{% endif %}
 </button>
 {% endif %}

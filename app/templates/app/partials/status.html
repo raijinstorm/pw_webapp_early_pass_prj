@@ -1,1 +1,6 @@
 {% include "app/partials/status_badge.html" %}
+{% if can_manage %}
+<button class="btn btn-sm btn-outline-secondary ms-1">
+  {% if config.status == "active" %}Disable{% else %}Activate{% endif %}
+</button>
+{% endif %}

@@ -107,6 +107,14 @@ def config_edit(request, pk):
             return redirect('config_detail', pk=pk)
     return render(request, 'app/config_form.html', {'form': form, 'product': product, 'config': configuration})
 
+@require_POST
+def config_toggle_status(request, pk):
+    (configuration, _, _) = get_configuration(request.user, pk, manage=True)
+    configuration['status'] = queries.toggle_status(pk)
+    if is_htmx(request):
+        return render(request, 'app/partials/status.html', {'config': configuration, 'can_manage': True})
+    return redirect('config_detail', pk=pk)
+
 def version_detail(request, pk):
     version = found(queries.version(pk))
     (_, role) = get_product(request.user, version['product_code'])
@@ -124,3 +132,57 @@ def version_restore(request, pk):
     except IntegrityError as error:
         messages.error(request, f"Version {version['number']} can't be restored: {error.__cause__.diag.message_primary}")
     return redirect('config_detail', pk=version['configuration_id'])
+
+def field_form(request, code, pk=None):
+    (product, _) = get_product(request.user, code, manage=True)
+    field = found(queries.schema_field(product['id'], pk)) if pk else None
+    initial = SchemaFieldForm.initial_from_row(field) if field else None
+    form = SchemaFieldForm(request.POST or None, initial=initial, editing=field is not None)
+    if request.method == 'POST' and form.is_valid():
+        values = form.values()
+        if field:
+            write = lambda : queries.update_schema_field(field['id'], values)
+        else:
+            write = lambda : queries.insert_schema_field(product['id'], values)
+        if save_or_show_errors(form, write, SCHEMA_FIELD_ERRORS):
+            messages.success(request, f"Field '{values['key']}' saved.")
+            return redirect('product_detail', code=code)
+    return render(request, 'app/field_form.html', {'form': form, 'product': product, 'field': field})
+
+def field_delete(request, code, pk):
+    (product, _) = get_product(request.user, code, manage=True)
+    field = found(queries.schema_field(product['id'], pk))
+    if request.method == 'POST':
+        queries.delete_schema_field(pk)
+        messages.success(request, f"Field '{field['key']}' deleted. Existing values stay in the version history.")
+        return redirect('product_detail', code=code)
+    return render(request, 'app/field_confirm_delete.html', {'field': field, 'product': product})
+
+def render_members(request, product, form=None):
+    context = {'product': product, 'memberships': queries.members(product['id']), 'member_form': form or MemberForm(), 'can_manage': True}
+    return render(request, 'app/partials/members.html', context)
+
+@require_POST
+def member_add(request, code):
+    (product, _) = get_product(request.user, code, manage=True)
+    form = MemberForm(request.POST)
+    if form.is_valid():
+        add = lambda : queries.add_member(product['id'], form.user_id, form.cleaned_data['role'])
+        if save_or_show_errors(form, add, MEMBER_ERRORS):
+            form = None
+    if not is_htmx(request):
+        return redirect('product_detail', code=code)
+    return render_members(request, product, form)
+
+@require_POST
+def member_remove(request, pk):
+    membership = found(queries.membership(pk))
+    product = found(queries.product_by_id(membership['product_id']))
+    get_product(request.user, product['code'], manage=True)
+    if membership['user_id'] == request.user.id:
+        messages.error(request, "You can't remove yourself from a product.")
+    else:
+        queries.remove_member(pk)
+    if not is_htmx(request):
+        return redirect('product_detail', code=product['code'])
+    return render_members(request, product)

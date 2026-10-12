@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Delete field{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-12 col-md-8 col-lg-6">
+    <div class="card border-danger-subtle">
+      <div class="card-body p-4">
+        <h1 class="h4">Delete field <code>{{ field.key }}</code>?</h1>
+        <p class="text-body-secondary">It will disappear from the {{ product.name }} edit form. Values already saved stay in the version history.</p>
+        <form method="post" class="d-flex gap-2">
+          {% csrf_token %}
+          <button class="btn btn-danger">Delete</button>
+          <a href="{% url 'product_detail' product.code %}" class="btn btn-outline-secondary">Cancel</a>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

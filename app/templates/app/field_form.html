@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Schema field{% endblock %}
+{% block content %}
+<nav aria-label="breadcrumb"><ol class="breadcrumb">
+  <li class="breadcrumb-item"><a href="{% url 'product_detail' product.code %}">{{ product.name }}</a></li>
+  <li class="breadcrumb-item active">{% if field %}Edit field {{ field.key }}{% else %}New field{% endif %}</li>
+</ol></nav>
+
+<div class="row justify-content-center">
+  <div class="col-12 col-md-9 col-lg-7">
+    <div class="card">
+      <div class="card-body p-4">
+        <h1 class="h4 mb-4">{% if field %}Edit field <code>{{ field.key }}</code>{% else %}New schema field{% endif %}</h1>
+        <form method="post">
+          {% csrf_token %}
+          {% include "app/partials/form_fields.html" %}
+          <div class="d-flex gap-2">
+            <button class="btn btn-primary">Save</button>
+            <a href="{% url 'product_detail' product.code %}" class="btn btn-outline-secondary">Cancel</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

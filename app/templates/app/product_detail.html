@@ -1,1 +1,82 @@
-{% extends 'base.html' %}{% block content %}<a href="{% url 'config_create' product.code %}">New configuration</a><h1>{{ product.name }}</h1><p>{{ product.description }}</p><table class="table"><tr><th>Client</th><th>Status</th></tr>{% for c in configs %}<tr><td><a href="{% url 'config_detail' c.id %}">{{ c.client_name }}</a></td><td>{{ c.status }}</td></tr>{% endfor %}</table>{% endblock %}
+{% extends "base.html" %}
+{% load app_extras %}
+{% block title %}{{ product.name }}{% endblock %}
+{% block content %}
+<nav aria-label="breadcrumb"><ol class="breadcrumb">
+  <li class="breadcrumb-item"><a href="{% url 'dashboard' %}">Dashboard</a></li>
+  <li class="breadcrumb-item active">{{ product.name }}</li>
+</ol></nav>
+
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-4">
+  <div>
+    <h1 class="h3 mb-1">{{ product.name }} {{ role|role_badge }}</h1>
+    <p class="text-body-secondary mb-0">{{ product.description }}</p>
+  </div>
+  <a href="{% url 'config_create' product.code %}" class="btn btn-primary"><i class="bi bi-plus-lg"></i> New configuration</a>
+</div>
+
+<div class="row g-4">
+  <div class="col-12 col-lg-7">
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span class="fw-semibold">Configurations</span>
+        <a href="{% url 'config_list' %}?product={{ product.code }}" class="small">Filter →</a>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead><tr><th>Client</th><th>Status</th><th class="text-end">Version</th><th class="d-none d-sm-table-cell">Updated</th></tr></thead>
+          <tbody>
+            {% for c in configs %}
+            <tr class="clickable" onclick="location.href='{% url 'config_detail' c.id %}'">
+              <td><a href="{% url 'config_detail' c.id %}" class="text-decoration-none">{{ c.client_name }}</a></td>
+              <td>{% include "app/partials/status_badge.html" with config=c %}</td>
+              <td class="text-end">v{{ c.version }}</td>
+              <td class="d-none d-sm-table-cell small text-body-secondary">{{ c.updated_at|date:"Y-m-d" }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="4" class="text-body-secondary text-center py-3">No configurations yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-lg-5">
+    <div class="card mb-4">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span class="fw-semibold">Schema</span>
+        {% if can_manage %}<a href="{% url 'field_create' product.code %}" class="btn btn-sm btn-outline-primary"><i class="bi bi-plus-lg"></i> Field</a>{% endif %}
+      </div>
+      <ul class="list-group list-group-flush">
+        {% for f in fields %}
+        <li class="list-group-item d-flex justify-content-between align-items-start gap-2">
+          <div>
+            <code>{{ f.key }}</code> <span class="badge text-bg-light border">{{ f.field_type|capfirst }}</span>
+            {% if f.required and f.field_type != "boolean" %}<span class="badge text-bg-warning-subtle text-warning-emphasis">required</span>{% endif %}
+            <div class="small text-body-secondary">{{ f.label }}
+              {% if f.min_value is not None or f.max_value is not None %}· range {{ f.min_value|floatformat:"-4"|default:"…" }} – {{ f.max_value|floatformat:"-4"|default:"…" }}{% endif %}
+              {% if f.choices %}· {{ f.choices|join:", " }}{% endif %}
+              {% if f.pattern %}· <code>{{ f.pattern }}</code>{% endif %}
+            </div>
+          </div>
+          {% if can_manage %}
+          <div class="text-nowrap">
+            <a href="{% url 'field_edit' product.code f.id %}" class="btn btn-sm btn-link" title="Edit"><i class="bi bi-pencil"></i></a>
+            <a href="{% url 'field_delete' product.code f.id %}" class="btn btn-sm btn-link text-danger" title="Delete"><i class="bi bi-trash"></i></a>
+          </div>
+          {% endif %}
+        </li>
+        {% empty %}
+        <li class="list-group-item text-body-secondary">No fields defined.</li>
+        {% endfor %}
+      </ul>
+    </div>
+
+    <div class="card">
+      <div class="card-header fw-semibold">Members</div>
+      <div id="members">{% include "app/partials/members.html" %}</div>
+    </div>
+  </div>
+</div>
+{% endblock %}

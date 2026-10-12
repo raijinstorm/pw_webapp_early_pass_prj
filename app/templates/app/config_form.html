@@ -1,1 +1,31 @@
-{% extends 'base.html' %}{% block content %}<h1>Configuration</h1><form method="post">{% csrf_token %}{{ form.as_p }}<button class="btn btn-primary">Save</button></form>{% endblock %}
+{% extends "base.html" %}
+{% block title %}{% if config %}Edit {{ config.client_name_name }}{% else %}New configuration{% endif %}{% endblock %}
+{% block content %}
+<nav aria-label="breadcrumb"><ol class="breadcrumb">
+  <li class="breadcrumb-item"><a href="{% url 'product_detail' product.code %}">{{ product.name }}</a></li>
+  {% if config %}<li class="breadcrumb-item"><a href="{% url 'config_detail' config.id %}">{{ config.client_name }}</a></li>{% endif %}
+  <li class="breadcrumb-item active">{% if config %}Edit{% else %}New{% endif %}</li>
+</ol></nav>
+
+<div class="row justify-content-center">
+  <div class="col-12 col-md-9 col-lg-7">
+    <div class="card">
+      <div class="card-body p-4">
+        <h1 class="h4 mb-1">{% if config %}Edit {{ config.client_name }}{% else %}New configuration{% endif %}</h1>
+        <p class="text-body-secondary small mb-4">
+          {{ product.name }}{% if config %} · currently version {{ config.version }}{% endif %}.
+          Values are checked against the product schema before saving.
+        </p>
+        <form method="post">
+          {% csrf_token %}
+          {% include "app/partials/form_fields.html" %}
+          <div class="d-flex gap-2">
+            <button class="btn btn-primary">{% if config %}Save new version{% else %}Create{% endif %}</button>
+            <a href="{% if config %}{% url 'config_detail' config.id %}{% else %}{% url 'product_detail' product.code %}{% endif %}" class="btn btn-outline-secondary">Cancel</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

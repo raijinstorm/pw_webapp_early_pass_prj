@@ -1,0 +1,9 @@
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "confighub.test_settings"
+testpaths = ["tests"]
+addopts = "--cov=app --cov=confighub --cov-report=term-missing --cov-fail-under=0"
+# WhiteNoise warns that collectstatic has not run; tests serve static files directly.
+filterwarnings = ["ignore:No directory at:UserWarning"]
+
+[tool.coverage.run]
+omit = ["*/migrations/*", "confighub/wsgi.py", "confighub/test_settings.py"]

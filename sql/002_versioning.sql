@@ -1,12 +1,14 @@
+-- Validation and versioning.
+--
+-- How a change is saved: INSERT a row into config_version. Triggers then
+--   1. lock the configuration, validate the data against the product schema,
+--      refuse a version that changes nothing, and assign the next version number;
+--   2. copy the data into configuration (the "current state" cache).
+-- Nobody can edit configuration.data directly, and versions can never be updated or deleted.
 
 
-
-
-
-
-
-
-
+-- Every problem with p_data for this product's schema, one row per key.
+-- field_key is NULL for problems that concern the whole object.
 CREATE FUNCTION config_errors(p_product_id bigint, p_data jsonb)
 RETURNS TABLE (field_key text, message text)
 LANGUAGE plpgsql STABLE AS $$
@@ -23,6 +25,7 @@ BEGIN
         RETURN;
     END IF;
 
+    -- Keys the schema does not know (e.g. a field that was deleted).
     RETURN QUERY
         SELECT k, 'Unknown key: not in the product schema.'
         FROM jsonb_object_keys(p_data) AS k
@@ -41,7 +44,7 @@ BEGIN
         END IF;
 
         t := jsonb_typeof(v);
-
+        -- CASE is evaluated in order, so the casts below only run on values of the right JSON type.
         message := CASE f.field_type
             WHEN 'boolean' THEN
                 CASE WHEN t <> 'boolean' THEN 'Must be true or false.' END
@@ -82,7 +85,7 @@ DECLARE
     cfg    configuration;
     errors jsonb;
 BEGIN
-
+    -- Lock the configuration so two simultaneous saves get consecutive numbers.
     SELECT * INTO cfg FROM configuration WHERE id = NEW.configuration_id FOR UPDATE;
 
     SELECT jsonb_object_agg(coalesce(field_key, '__all__'), message) INTO errors
@@ -98,7 +101,7 @@ BEGIN
     END IF;
 
     NEW.number := cfg.version + 1;
-
+    -- Audit timestamps come from the database clock. Only the demo-data script may backdate them.
     IF current_setting('confighub.allow_backdate', true) IS DISTINCT FROM 'on' THEN
         NEW.created_at := now();
     END IF;
@@ -123,6 +126,8 @@ CREATE TRIGGER config_version_after_insert
     AFTER INSERT ON config_version
     FOR EACH ROW EXECUTE FUNCTION config_version_after_insert();
 
+
+-- History is append-only.
 CREATE FUNCTION config_version_immutable() RETURNS trigger
 LANGUAGE plpgsql AS $$
 BEGIN
@@ -135,6 +140,8 @@ CREATE TRIGGER config_version_immutable
     FOR EACH ROW EXECUTE FUNCTION config_version_immutable();
 
 
+-- configuration.data/version may only be written by the config_version trigger (trigger depth 2).
+-- A new configuration starts empty at version 0.
 CREATE FUNCTION configuration_guard() RETURNS trigger
 LANGUAGE plpgsql AS $$
 BEGIN
@@ -154,6 +161,8 @@ CREATE TRIGGER configuration_guard
     BEFORE INSERT OR UPDATE ON configuration
     FOR EACH ROW EXECUTE FUNCTION configuration_guard();
 
+
+-- A field's key and product never change: stored data refers to them.
 CREATE FUNCTION schema_field_key_locked() RETURNS trigger
 LANGUAGE plpgsql AS $$
 BEGIN
@@ -168,6 +177,8 @@ CREATE TRIGGER schema_field_key_locked
     BEFORE UPDATE ON schema_field
     FOR EACH ROW EXECUTE FUNCTION schema_field_key_locked();
 
+
+-- Create a configuration together with its first version, in one call.
 CREATE FUNCTION create_configuration(p_product_id bigint, p_client_id bigint, p_data jsonb, p_author_id bigint, p_comment text)
 RETURNS bigint
 LANGUAGE plpgsql AS $$
@@ -179,6 +190,7 @@ BEGIN
     RETURN new_id;
 END $$;
 
+-- Save an old version's data as a new version. Returns the new version number.
 CREATE FUNCTION restore_version(p_version_id bigint, p_author_id bigint) RETURNS integer
 LANGUAGE sql AS $$
     INSERT INTO config_version (configuration_id, data, author_id, comment)

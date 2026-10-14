@@ -1,4 +1,4 @@
-
+# Throwaway PostgreSQL for the test suite (data lives in memory and disappears on stop).
 services:
   test-db:
     image: postgres:17-alpine

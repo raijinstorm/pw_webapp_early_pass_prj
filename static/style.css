@@ -1,4 +1,4 @@
-
+/* Small additions on top of Bootstrap. */
 
 body {
   background: #f5f6f8;
@@ -45,7 +45,7 @@ tr.clickable {
   color: #1d6b35;
 }
 
-
+/* Fade content while HTMX is loading it. */
 .htmx-request #results,
 #results.htmx-request {
   opacity: 0.5;

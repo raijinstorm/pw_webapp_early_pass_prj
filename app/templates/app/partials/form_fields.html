@@ -1,4 +1,4 @@
-
+{% comment %}Renders any form with Bootstrap markup. Usage: {% include "app/partials/form_fields.html" with form=form %}{% endcomment %}
 {% load app_extras %}
 {% for error in form.non_field_errors %}
 <div class="alert alert-danger">{{ error }}</div>

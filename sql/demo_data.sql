@@ -1,6 +1,6 @@
-
-
-
+-- Fictional demo data: products with schemas, clients, memberships and configuration history.
+-- Run by `manage.py seed_demo` after it has created the demo users (passwords need Django's hasher).
+-- Every version goes through the normal triggers, so the demo data is validated like real input.
 
 SET LOCAL confighub.allow_backdate = 'on';
 SELECT setseed(0.42);
@@ -51,6 +51,8 @@ FROM (VALUES
 ) AS f (product_code, position, key, label, field_type, required, min_value, max_value, choices, pattern, help_text)
 JOIN product p ON p.code = f.product_code;
 
+
+-- A random but valid value for a schema field.
 CREATE FUNCTION pg_temp.demo_value(f schema_field, client_name text) RETURNS jsonb
 LANGUAGE sql AS $$
     SELECT CASE f.field_type
@@ -68,6 +70,7 @@ LANGUAGE sql AS $$
     END;
 $$;
 
+-- Six clients per product, each with 1–5 versions spread over the last weeks.
 DO $$
 DECLARE
     p        record;
@@ -94,7 +97,7 @@ BEGIN
 
             FOR i IN 2 .. 1 + floor(random() * 5)::int LOOP
                 v_prev := v_data;
-
+                -- Change one or two random fields.
                 SELECT v_data || jsonb_object_agg(f.key, pg_temp.demo_value(f, cl.name)) INTO v_data
                 FROM (SELECT * FROM schema_field WHERE product_id = p.id ORDER BY random() LIMIT 1 + floor(random() * 2)::int) f;
                 CONTINUE WHEN v_data = v_prev;

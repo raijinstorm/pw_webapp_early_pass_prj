@@ -1,5 +1,7 @@
+-- Access rules and read models used by the pages.
 
 
+-- 'admin', 'manager', 'editor', or NULL when the user has no access to the product.
 CREATE FUNCTION user_role(p_user_id bigint, p_product_id bigint) RETURNS text
 LANGUAGE sql STABLE AS $$
     SELECT CASE
@@ -10,6 +12,7 @@ LANGUAGE sql STABLE AS $$
     WHERE u.id = p_user_id AND u.is_active;
 $$;
 
+-- Products the user may see: all for admins, otherwise the ones they are a member of.
 CREATE FUNCTION visible_product_ids(p_user_id bigint) RETURNS TABLE (product_id bigint)
 LANGUAGE sql STABLE AS $$
     SELECT p.id FROM product p
@@ -20,6 +23,8 @@ LANGUAGE sql STABLE AS $$
     WHERE m.user_id = p_user_id;
 $$;
 
+
+-- Table 1: configurations with readable names.
 CREATE VIEW configuration_overview AS
 SELECT c.id,
        c.product_id,
@@ -37,6 +42,7 @@ JOIN product p  ON p.id = c.product_id
 JOIN client cl  ON cl.id = c.client_id
 LEFT JOIN app_user u ON u.id = c.updated_by_id;
 
+-- Table 2: change history with readable names.
 CREATE VIEW version_overview AS
 SELECT v.id,
        v.configuration_id,
@@ -58,6 +64,8 @@ JOIN client cl       ON cl.id = c.client_id
 LEFT JOIN app_user u ON u.id = v.author_id;
 
 
+-- What one version changed compared with the version before it (all keys for version 1),
+-- in schema order. Keys no longer in the schema come last.
 CREATE FUNCTION version_changes(p_version_id bigint)
 RETURNS TABLE (key text, old_value jsonb, new_value jsonb)
 LANGUAGE sql STABLE AS $$
@@ -77,7 +85,7 @@ LANGUAGE sql STABLE AS $$
         UNION
         SELECT jsonb_object_keys(prev.data) FROM prev
     )
-
+    -- A JSON null counts as "no value", the same as a missing key.
     SELECT k.key, nullif(prev.data -> k.key, 'null'), nullif(cur.data -> k.key, 'null')
     FROM keys k
     CROSS JOIN cur

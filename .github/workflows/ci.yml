@@ -1,5 +1,5 @@
-
-
+# Runs the whole test suite (database, unit, integration, Playwright) on every push and pull request.
+# Fails if a test fails or coverage drops below 70% (see pyproject.toml).
 name: CI
 
 on:
@@ -10,6 +10,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
 
+    # Same throwaway PostgreSQL as docker-compose.test.yml, on the port confighub/test_settings.py expects.
     services:
       postgres:
         image: postgres:17-alpine

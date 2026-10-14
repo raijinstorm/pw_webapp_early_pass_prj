@@ -3,7 +3,7 @@
 {% block content %}
 <h1 class="h3 mb-3">Configurations</h1>
 
-
+{# Any change in the filters reloads only #results via HTMX, and updates the URL so the view can be shared. #}
 <form class="row g-2 mb-3" method="get" action="{% url 'config_list' %}"
       hx-get="{% url 'config_list' %}" hx-target="#results" hx-push-url="true"
       hx-trigger="input changed delay:300ms from:input[name='q'], change">

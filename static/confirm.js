@@ -1,6 +1,6 @@
-
-
-
+// Confirmation dialog (Bootstrap modal) instead of the browser's confirm() pop-up.
+// - HTMX elements with hx-confirm="..." ask here before sending their request.
+// - Normal forms with data-confirm="..." ask here before submitting.
 
 (function () {
   const modalElement = document.getElementById("confirm-modal");
@@ -22,7 +22,7 @@
   });
 
   document.addEventListener("htmx:confirm", (event) => {
-    if (!event.detail.question) return;
+    if (!event.detail.question) return; // no hx-confirm on this element
     event.preventDefault();
     ask(event.detail.question, () => event.detail.issueRequest(true));
   });

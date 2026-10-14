@@ -45,7 +45,7 @@
       <div class="card-header fw-semibold">Version history</div>
       <div class="list-group list-group-flush">
         {% for v in versions %}
-        
+        {# Clicking a version loads its details below the list without reloading the page. #}
         <button type="button" class="list-group-item list-group-item-action"
                 hx-get="{% url 'version_detail' v.id %}" hx-target="#version-detail">
           <div class="d-flex justify-content-between">

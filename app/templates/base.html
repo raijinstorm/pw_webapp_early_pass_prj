@@ -9,7 +9,7 @@
   <link href="{% static 'style.css' %}" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.4/dist/htmx.min.js" defer></script>
 </head>
-
+{# Send the CSRF token with every HTMX request, so POSTs made by HTMX pass Django's CSRF check. #}
 <body hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
 {% if user.is_authenticated %}
 <nav class="navbar navbar-expand-md bg-dark" data-bs-theme="dark">
@@ -60,7 +60,7 @@
   {% block content %}{% endblock %}
 </main>
 
-
+{# Shared confirmation dialog, used by static/confirm.js for hx-confirm and data-confirm. #}
 <div class="modal fade" id="confirm-modal" tabindex="-1" aria-labelledby="confirm-title" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered modal-sm">
     <div class="modal-content">

@@ -1,8 +1,32 @@
 # ConfigHub
 
-Governed configuration management for a Databricks-based analytics platform.
+**Governed configuration management for a Databricks-based analytics platform.**
 
-The company, clients and people described here are fictional.
+> The company, clients and people below are fictional. The problem is a real one, seen on data platforms
+> built around Databricks.
+
+**Contents**
+
+- [Part 1 · The business problem](#part-1--the-business-problem)
+  - [The company](#the-company)
+  - [How configuration is managed today](#how-configuration-is-managed-today)
+  - [Why Databricks alone doesn't solve it](#why-databricks-alone-doesnt-solve-it)
+  - [The solution: ConfigHub](#the-solution-confighub)
+  - [Roles and use cases](#roles-and-use-cases)
+  - [Screenshots](#screenshots)
+  - [Prototype vs. production](#prototype-vs-production)
+- [Part 2 · Technical documentation](#part-2--technical-documentation)
+  - [Stack](#stack)
+  - [Architecture and dataflow](#architecture-and-dataflow)
+  - [Where the logic lives](#where-the-logic-lives)
+  - [Project structure](#project-structure)
+  - [Run it](#run-it)
+  - [Test it](#test-it)
+  - [Extend it](#extend-it)
+
+---
+
+## Part 1 · The business problem
 
 ### The company
 
@@ -30,7 +54,7 @@ the forecast horizon, the warehouse code, who to notify when a run fails, and so
 These settings live in **more than a thousand Excel and CSV files on Azure Blob Storage**, which the Databricks
 jobs read at run time:
 
-
+![Today: configuration as Excel/CSV files on Azure Blob Storage, read by Databricks jobs, pipelines, scheduling and ML](docs/images/today-excel-on-blob.png)
 
 Changing one value means: find the right file, download it, edit it locally, upload it back and hope it was
 the latest copy. The result:
@@ -62,7 +86,7 @@ configuration**, with validation, per-product permissions and history built in.
 ConfigHub sits between the people and the platform. Jobs and pipelines still read their configuration, but people
 change it through an app with validation, permissions and history, instead of by uploading files.
 
-
+![With ConfigHub: the app manages configuration, and Databricks jobs, pipelines, scheduling and ML read from it](docs/images/with-confighub.png)
 
 | Problem today | How ConfigHub solves it |
 |---|---|
@@ -89,16 +113,140 @@ Main use cases:
 5. **Find things.** Anyone filters configurations (product, client, status, search) and the change history (product, author, date range).
 6. **Recover an account.** A user who forgot their password resets it through an email link.
 
-## First technical choices
+### Screenshots
 
-Python 3.12, Django, PostgreSQL and server-rendered Bootstrap pages. Start with Django models and normal HTML forms. Docker Compose will run the app and database.
+Logged in as Anna, manager of the Pricing Feed. All data is fictional demo data.
 
-`confighub/` contains settings, `app/` the application, `static/` styling and `docs/` supporting material.
+| | |
+|---|---|
+| **Login** (with password reset link)<br>![Login page](docs/screenshots/01-login.png) | **Dashboard**: your products, your role, recent changes<br>![Dashboard](docs/screenshots/02-dashboard.png) |
+| **Table 1, configurations**, filtered by status without a page reload<br>![Configurations table filtered to active](docs/screenshots/03-configurations-filtered.png) | **Table 2, change history**, filtered by author<br>![History table filtered by author](docs/screenshots/04-history-filtered.png) |
+| **Product page**: configurations, schema rules and members (manager view)<br>![Product page with schema and members](docs/screenshots/05-product-schema-members.png) | **Configuration**: current values, version history and the diff of a version<br>![Configuration with version diff](docs/screenshots/06-configuration-version-diff.png) |
+| **Editing**: the database rejects a value that breaks the schema<br>![Edit form with validation error](docs/screenshots/07-edit-validation-error.png) | **Mobile** (390 px wide): collapsed menu, stacked filters<br>![Configurations on a phone](docs/screenshots/08-mobile-configurations.png) |
 
-## Run
+### Prototype vs. production
 
-Copy `.env.example` to `.env`, set the example credentials, then run `docker compose up -d --build`. Open http://localhost:8000. Create a login with `docker compose exec web python manage.py createsuperuser`.
+This repository is a **prototype**. It runs anywhere with Docker and depends on no cloud service.
 
-## Validation update
+| | Prototype (this repo) | Production options |
+|---|---|---|
+| App | Docker container on a separate machine | Azure App Service / Container Apps, or **Databricks Apps** (inside the platform, using Databricks sign-in) |
+| Database | PostgreSQL in Docker | **Azure Database for PostgreSQL**, or **Databricks Lakebase** (managed PostgreSQL inside Databricks) |
+| How jobs read configs | (not built) | Jobs query the `configuration` table directly, or a sync publishes it to a Delta table they already read |
 
-PostgreSQL now checks schema rules and reference-data constraints. Django still manages version creation for now. Existing demo databases need their current configuration data represented by version rows before the next versioning update.
+All business rules live in PostgreSQL (see [Where the logic lives](#where-the-logic-lives)), so moving to a managed
+PostgreSQL such as Azure Database for PostgreSQL or Lakebase means changing the connection settings, not the code.
+
+---
+
+## Part 2 · Technical documentation
+
+### Stack
+
+| Layer | Choice |
+|---|---|
+| Backend | Django 5.2 (Python 3.12), gunicorn, WhiteNoise for static files |
+| Frontend | Django templates, Bootstrap 5, HTMX for AJAX (both from a CDN, no build step) |
+| Database | PostgreSQL 17: tables, constraints, triggers and PL/pgSQL functions in [sql/](sql/) |
+| Data access | Parameterized SQL in [app/queries.py](app/queries.py); Django ORM only for users/auth and the admin panel |
+| Email | Console backend by default (emails appear in the logs); SMTP via `.env` for real delivery. Reset links expire after 1 hour |
+| Deployment | Docker Compose: `web` + `db` |
+| Tests | pytest-django, coverage.py, Playwright; GitHub Actions CI |
+
+
+### Architecture and dataflow
+
+```
+Browser ──HTMX / forms──▶ Django views ──▶ app/queries.py ──parameterized SQL──▶ PostgreSQL
+                              │                                                 constraints, triggers,
+                              └── login, admin ──▶ Django ORM ─────────────────▶ functions, views
+```
+
+What happens when an editor saves a change:
+
+1. The browser posts the edit form. Django checks the user is logged in, and the SQL function `user_role()` checks they may edit this product.
+2. The form parses the input into types (number, date, yes/no) and builds a JSON object.
+3. `app/queries.py` runs `INSERT INTO config_version (configuration_id, data, author_id, comment)`.
+4. Triggers in PostgreSQL lock the configuration, validate the JSON against the product schema (`config_errors()`), refuse a no-op change, assign the next version number and copy the data into `configuration`.
+5. If the database refuses, the constraint name and details are mapped onto the right form field and shown to the user. Otherwise the user lands on the configuration page with the new version.
+
+Filtering a table works through HTMX: changing a filter requests the same URL with an `HX-Request` header, and the
+server returns only the table, which replaces the old one without a page reload.
+
+### Where the logic lives
+
+The database owns the business logic, so the rules hold for every client: the web app, the admin panel, or `psql`.
+
+| File | Contents |
+|---|---|
+| [sql/001_tables.sql](sql/001_tables.sql) | Domain tables, with every rule as a **named constraint** (field types, min ≤ max, options only for choice fields, valid regex, uniqueness, roles, statuses) |
+| [sql/002_versioning.sql](sql/002_versioning.sql) | `config_errors()` (schema validation) and the versioning triggers: **saving means inserting a version**, history is **immutable**, `configuration.data` can't be edited directly. Also `create_configuration()` and `restore_version()` |
+| [sql/003_access_and_reports.sql](sql/003_access_and_reports.sql) | `user_role()`, `visible_product_ids()`, the views behind both tables, and `version_changes()` (the diff between versions) |
+| [sql/demo_data.sql](sql/demo_data.sql) | Fictional demo data, inserted through the same triggers as real input |
+
+Django keeps what it's good at: users, login, password reset, sessions and the admin panel. The models in
+[app/models.py](app/models.py) are thin mirrors of the SQL tables, so the admin panel and test tooling know them.
+
+### Project structure
+
+```
+sql/              the database: tables + constraints, versioning, access and reports, demo data
+confighub/        Django project: settings, root URLs, test settings
+app/
+  views.py        pages; HTMX requests get partial templates
+  forms.py        input parsing; database errors → form errors
+  queries.py      every SQL statement the pages run
+  db.py           small helpers for running SQL
+  models.py       thin ORM mirror (users, admin panel)
+  templates/      pages and HTMX partials
+static/           CSS
+tests/            db (SQL rules), unit, integration, e2e (Playwright)
+docs/             diagrams and screenshots
+```
+
+### Run it
+
+Requires Docker.
+
+```bash
+cp .env.example .env
+docker compose up -d --build
+```
+
+Open http://localhost:8000. On first start the database schema is created and demo data is loaded: three products,
+eight clients, 18 configurations with history, and six users (`admin`, managers `anna`, `tomasz`, `piotr`,
+editors `ewa`, `jan`). All demo users share the password set as `DEMO_PASSWORD` in `.env`.
+
+- Password-reset emails: `docker compose logs web` (links expire after 1 hour). For real delivery, set the SMTP variables in `.env` (see `.env.example`) and run `docker compose up -d` again
+- Stop: `docker compose down` (add `-v` to also delete the database)
+
+### Test it
+
+The tests run against a real PostgreSQL, because the logic is in PL/pgSQL.
+
+```bash
+docker compose -f docker-compose.test.yml up -d     # throwaway test database on port 5433
+python3.12 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
+.venv/bin/playwright install chromium
+.venv/bin/python -m pytest
+```
+
+| Suite | Checks |
+|---|---|
+| `tests/db` | SQL rules directly: constraints, schema validation, versioning, immutability, access functions |
+| `tests/unit` | forms, SQL helpers, template filters |
+| `tests/integration` | HTTP requests through Django: login and password reset, access per role, both tables and their filters, editing, restore, admin panel |
+| `tests/e2e` | a real browser (Playwright): login, filtering without reload, validation, version diff, status toggle, mobile layout |
+
+The run fails if coverage drops below 70%. The same suite runs on every push via GitHub Actions
+([.github/workflows/ci.yml](.github/workflows/ci.yml)).
+
+### Extend it
+
+- **New configuration field:** no code needed. A manager adds it on the product page; the database validates it from then on.
+- **New business rule:** add a new numbered SQL file (e.g. `sql/004_….sql`) and a migration that runs it, following
+  [app/migrations/0001_initial.py](app/migrations/0001_initial.py). If it's a constraint, add its name and a message
+  to the matching error map in [app/forms.py](app/forms.py). Never edit a SQL file that has already been applied.
+- **New page:** add the query to `app/queries.py`, a view in `app/views.py`, a URL in `app/urls.py` and a template.
+  Return a partial template when `is_htmx(request)` if the page updates in place.
+- **New table:** create it in SQL, then add a thin model (and a state-only migration) only if the admin panel should manage it.
